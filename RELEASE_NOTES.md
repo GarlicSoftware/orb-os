@@ -20,13 +20,11 @@ Rules for a section, all of them learned from what reads badly on that card:
 
 ## 2.17.01
 
-- Fix cached clock-hand stacking in src/clock_view.cpp. The sweep renderer previously 
-  composited the combined hour/minute layers immediately above the second hand, even 
-  when a hand was already present below seconds in the restored cache or a static layer 
-  required a different stacking position. Restrict pair reuse to adjacent, normally blended 
-  hour/minute hands above seconds, and insert the pair once at the first hand's position in the 
-  theme order. Use the existing individual rendering path for all other orders and blend modes, 
-  retaining upstream's inline layer-rebuild scheduling.
+- The hands are stacked the way the design asks again. The second hand was being pinned
+  underneath the others whatever the arrows on the hands card said, and on a dial where it
+  is shorter than the minute hand that left pieces of the old hands on the glass, cleared
+  only as the sweep passed over them. Worst in the first minute after a theme change. Found
+  and filmed by johnplayerspecial, traced to the cached hand layers and fixed by Lerxtwood
 
 ---
 
