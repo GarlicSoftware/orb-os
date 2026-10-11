@@ -1565,6 +1565,32 @@ int main(int argc, char **argv) {
                        moves && sane && fixed ? "PASS" : "FAIL", (double)mins, (double)px);
             }
 
+            // MULTIPLY OVER WHITE CHANGES NOTHING, which is the whole reason a hand uses it.
+            //
+            // Zion, 2026-10-11, on a white watch face: "I can see a shadow of the box around
+            // the hand." The blend reads both pixels back out of 565, and reading them by
+            // shifting left alone stopped short of 255, so white times white came back one
+            // step darker and the hand's own image box printed itself onto the dial. Screen
+            // had the mirror of it: black over black crept upward.
+            //
+            // The ends are what matter and the ends are what this holds. A midtone is left
+            // alone deliberately: multiply genuinely darkens there, and pinning a number to
+            // it would be a test of the arithmetic rather than of the thing anybody sees.
+            {
+                lv_color_t wc; wc = LV_COLOR_MAKE(255, 255, 255);
+                lv_color_t bc; bc = LV_COLOR_MAKE(0, 0, 0);
+                const uint16_t white = (uint16_t)wc.full;
+                const uint16_t black = (uint16_t)bc.full;
+                const uint16_t mw = clockview::blendSelf(white, 1);
+                const uint16_t sb = clockview::blendSelf(black, 2);
+                printf("[selftest] a multiplied hand leaves a white dial alone: %s"
+                       " (white 0x%04X came back 0x%04X)\n",
+                       mw == white ? "PASS" : "FAIL", white, mw);
+                printf("[selftest] and a screened one leaves a black dial alone: %s"
+                       " (black 0x%04X came back 0x%04X)\n",
+                       sb == black ? "PASS" : "FAIL", black, sb);
+            }
+
             // SWEEPING ROUND TWICE LANDS ON THE SAME PIXELS.
             //
             // Jean-Paul Stringaro, 2026-10-05: "portions of the screen / dial show changes in

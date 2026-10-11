@@ -85,6 +85,11 @@ namespace clockview {
     // watchmaker would quote (8 is 28,800, 4 is 14,400).
     int       sweepBeat();
     long      sweepDiffersBy(int *x, int *y);
+    // What a 565 colour blended with itself comes back as, which is the one piece of
+    // arithmetic the Multiply and Screen blends on a hand turn on. White multiplied by
+    // white has to stay white, or the hand's own image box prints a grey rectangle onto
+    // the dial. Returns the packed 565 result, to compare against what it started from.
+    uint16_t  blendSelf(uint16_t packed565, int blend);
     float     railwayStopStart();
     // Which beat of the second a given instant falls in. Exposed so the self-test can hold the
     // one piece of arithmetic that decides how often a theme ticks.
