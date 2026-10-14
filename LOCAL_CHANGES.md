@@ -1,6 +1,6 @@
 # Relaxed rock gesture
 
-Local build `2.17.01-relaxed-rock.3`, based on Orb OS 2.17.01.
+Local build `2.17.01-relaxed-rock.4`, based on Orb OS 2.17.01.
 
 Turn a short distance either way, reverse, then stop. Both halves can span up to
 12 detected clicks. The reversal can take up to 1.5 seconds, instead of 250 ms.
@@ -30,6 +30,19 @@ Regression tests assert delivery on every menu click in both directions, includi
 reversals, and verify that no deferred rock fires after leaving the menu.
 
 ## Build and verify
+
+In `.4`, the Settings renderer clips each unrotated glyph to its actual rectangle
+instead of scanning a square around the glyph diagonal for all 24 glow copies.
+Row interpolation coordinates are computed once per row; horizontal coordinates
+are cached in 768 bytes of shared scratch for ordinary-width glyphs, with the
+original calculation retained for larger glyphs. The glyph, glow,
+opacity, and overlap calculations produce byte-identical output in 400 comparison
+cases against commit `3291ca4`, including fractional coordinates and clipping.
+Run `python tests/run_settings_blit.py` from a Visual Studio developer prompt.
+On the physical Orb with Aviator, a matched six-turn Settings sequence from the
+top-level list dropped from a median 547 ms to 297 ms in USB command handling
+(about 46% less time). This measures the Settings handler, not complete
+input-to-visible-display latency. The final app upload's hash verified.
 
 ```powershell
 python -m platformio run -e esp32-s3-amoled-175

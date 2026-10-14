@@ -18,6 +18,12 @@ namespace {
 lv_obj_t   *s_canvas = nullptr;
 lv_color_t *s_buf    = nullptr;
 
+// The renderer runs on the LVGL thread. Small shared scratch avoids recalculating
+// horizontal interpolation coordinates for every row of every glow copy.
+constexpr int X_SAMPLE_CAPACITY = 128;
+int16_t s_xIndex[X_SAMPLE_CAPACITY];
+float s_xFraction[X_SAMPLE_CAPACITY];
+
 // Straight-line glyph blit + glow — same technique as menu_text.cpp (itself
 // copied from radar_view.cpp's selection-banner renderer): reads a 4-bpp
 // glyph alpha bitmap (lv_font_conv --bpp 4 --no-compress layout, same as the
@@ -35,16 +41,41 @@ void blit_glyph(const uint8_t *bmp, int bw, int bh, float destCx, float destCy,
     if (!bmp || bw <= 0 || bh <= 0 || !s_buf) return;
     uint8_t *buf = (uint8_t *)s_buf;
     const float reach = sqrtf((bw * 0.5f) * (bw * 0.5f) + (bh * 0.5f) * (bh * 0.5f)) + 1.0f;
-    const int x0 = (int)fmaxf(0.0f, destCx - reach), x1 = (int)fminf((float)SCREEN_W - 1, destCx + reach);
-    const int y0 = (int)fmaxf(0.0f, destCy - reach), y1 = (int)fminf((float)SCREEN_H - 1, destCy + reach);
+    // These glyphs are translated, never rotated. The old square around their
+    // diagonal scanned large empty regions for every one of the 24 glow copies.
+    // Keep the original clipping envelope but restrict it to the glyph rectangle
+    // plus a conservative interpolation margin; pixel math below stays identical.
+    const int x0 = (int)fmaxf(fmaxf(0.0f, destCx - reach), floorf(destCx - bw * 0.5f) - 2);
+    const int x1 = (int)fminf(fminf((float)SCREEN_W - 1, destCx + reach), ceilf(destCx + bw * 0.5f) + 2);
+    const int y0 = (int)fmaxf(fmaxf(0.0f, destCy - reach), floorf(destCy - bh * 0.5f) - 2);
+    const int y1 = (int)fminf(fminf((float)SCREEN_H - 1, destCy + reach), ceilf(destCy + bh * 0.5f) + 2);
     const float pivotX = bw * 0.5f, pivotY = bh * 0.5f;
-    for (int dy = y0; dy <= y1; ++dy) {
-        const float sy = dy - destCy + pivotY;
+    const bool cacheX = x1 - x0 + 1 <= X_SAMPLE_CAPACITY;
+    if (cacheX) {
         for (int dx = x0; dx <= x1; ++dx) {
             const float sx = dx - destCx + pivotX;
-            const int ix = (int)floorf(sx), iy = (int)floorf(sy);
-            if (ix < -1 || iy < -1 || ix >= bw || iy >= bh) continue;
-            const float fx = sx - ix, fy = sy - iy;
+            const int ix = (int)floorf(sx);
+            s_xIndex[dx - x0] = (int16_t)ix;
+            s_xFraction[dx - x0] = sx - ix;
+        }
+    }
+    for (int dy = y0; dy <= y1; ++dy) {
+        const float sy = dy - destCy + pivotY;
+        const int iy = (int)floorf(sy);
+        if (iy < -1 || iy >= bh) continue;
+        const float fy = sy - iy;
+        for (int dx = x0; dx <= x1; ++dx) {
+            int ix;
+            float fx;
+            if (cacheX) {
+                ix = s_xIndex[dx - x0];
+                fx = s_xFraction[dx - x0];
+            } else {
+                const float sx = dx - destCx + pivotX;
+                ix = (int)floorf(sx);
+                fx = sx - ix;
+            }
+            if (ix < -1 || ix >= bw) continue;
             const float a00 = (ix >= 0 && iy >= 0 && ix < bw && iy < bh) ? glyph_alpha4(bmp, bw, ix, iy) : 0.0f;
             const float a10 = (ix + 1 >= 0 && iy >= 0 && ix + 1 < bw && iy < bh) ? glyph_alpha4(bmp, bw, ix + 1, iy) : 0.0f;
             const float a01 = (ix >= 0 && iy + 1 >= 0 && ix < bw && iy + 1 < bh) ? glyph_alpha4(bmp, bw, ix, iy + 1) : 0.0f;
