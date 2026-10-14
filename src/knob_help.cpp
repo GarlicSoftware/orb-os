@@ -43,7 +43,7 @@ void ensure() {
     lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(body, 340);
     lv_label_set_text(body,
-                      "To activate the main menu from any app, "
+                      "To open the app menu outside Settings, "
                       "\"rock\" the knob by turning it a short way "
                       "left and then right, then stopping");
     lv_obj_set_style_text_color(body, lv_color_white(), 0);

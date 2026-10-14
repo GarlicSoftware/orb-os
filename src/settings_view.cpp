@@ -1623,8 +1623,7 @@ void settingsview::onPress() {
         if (s_volTarget == VOL_TICK)       host_set_tick_volume(s_vol, true);
         else if (s_volTarget == VOL_CHIME) host_set_chime_volume(s_vol, true);
         else                             { host_set_volume(s_vol, true); host_sound_preview_beep(); }
-        app_shell::setCaptured(false);      // back always exits to the switcher, not one level up
-        app_shell::openSwitcher();
+        show_page(MODE_SOUND);              // save, then return to the parent Sound menu
     } else if (s_mode == MODE_LOCATION) {
         if (s_lmSel == LM_CURRENT) {
             lv_label_set_text(s_lmItems[LM_CURRENT], "Locating...");

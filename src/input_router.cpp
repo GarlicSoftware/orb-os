@@ -123,6 +123,16 @@ void input_router::dispatch(int delta, bool pressed) {
         return;
     }
 
+    // Settings owns turns for navigation and editing, including reversals.
+    // Its Back controls provide an explicit exit to the app switcher.
+    if (app_shell::index() == app_shell::APP_SETTINGS) {
+        s_firedAt = knob::lastRockMs();
+        s_held = 0;
+        if (delta != 0) app_shell::turnCurrent(delta);
+        if (pressed) app_shell::pressCurrent();
+        return;
+    }
+
     // A wound-down clock asking to be wound. Turning winds it; a press does nothing,
     // because five turns is the price and a press would be a way to skip it.
     //
@@ -149,25 +159,8 @@ void input_router::dispatch(int delta, bool pressed) {
     // also handed to the app underneath. Without this, rocking out of the flight tracker
     // would select an aircraft on the way past.
     //
-    // The rock works EVERYWHERE, captured screens included. Reversed 2026-09-11.
-    //
-    // It was switched off for any screen that had captured the knob, on the reasoning that
-    // Settings scrolls a list with it and scrolling back and forth is an ordinary thing to do
-    // there, so a rock would throw you out mid-read. Two things have changed since that was
-    // written.
-    //
-    // The local relaxed gesture works in captured screens too. A short scroll
-    // and correction can therefore open the switcher, an intentional usability tradeoff.
-    //
-    // The alternative was the Orb contradicting itself. The hint it shows on a press that has
-    // nowhere to go says "To activate the main menu from any app, rock the knob", and Settings
-    // was the one screen where that sentence was false. Zion: "if anywhere in the settings
-    // menu, if you want to get out of it, go back to the main menu, you should be able to do
-    // the rock motion." One gesture, one meaning, every screen.
-    //
-    // Safe to allow: load() sets the captured flag from the app being entered and runs the
-    // outgoing app's exit hook on every real switch, so a screen rocked out of leaves neither
-    // its capture nor its state behind.
+    // The gesture opens the switcher from other apps, including captured screens.
+    // Settings is routed above, so ordinary navigation cannot be mistaken for exit.
     if (rock == ROCK_FIRE) {
         app_shell::openSwitcher();
         return;

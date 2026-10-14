@@ -1,6 +1,6 @@
 # Relaxed rock gesture
 
-Local build `2.17.01-relaxed-rock.4`, based on Orb OS 2.17.01.
+Local build `2.17.01-relaxed-rock.5`, based on Orb OS 2.17.01.
 
 Turn a short distance either way, reverse, then stop. Both halves can span up to
 12 detected clicks. The reversal can take up to 1.5 seconds, instead of 250 ms.
@@ -11,7 +11,7 @@ The limits live in `src/rock_config.h` and are shared by the device encoder,
 desktop encoder, and menu router. The router's idle tick now dispatches a completed
 gesture instead of consuming it during a preliminary state check.
 
-Back-and-forth scrolling in an app may also open the menu with these wider limits.
+Back-and-forth scrolling outside Settings may also open the menu with these wider limits.
 Pressing selects the highlighted app. The app menu stays open until you press;
 the original two-second automatic selection timer has been removed in `.3`.
 Verified on the board by opening the app menu, moving to another item, and waiting
@@ -28,6 +28,18 @@ the menu after selecting an app. One detected click still moves one menu item.
 
 Regression tests assert delivery on every menu click in both directions, including
 reversals, and verify that no deferred rock fires after leaving the menu.
+
+## Settings navigation
+
+In `.5`, Settings receives turns directly, without the rock detector holding or
+discarding direction changes. This applies to its lists and value editors; use
+Back to leave Settings. The forgiving rock gesture remains available elsewhere.
+Saving master, tick, or chime volume returns to Sound, with the same volume item
+selected, instead of opening the app switcher. Volume persistence and the master
+volume preview are retained.
+Regression tests exercise immediate Settings reversals and consume stale gestures
+on exit. `tests/run_volume_return.py` checks the actual save branch for all three
+targets at levels 0, 50, and 100, including persistence, Sound return, and preview.
 
 ## Build and verify
 

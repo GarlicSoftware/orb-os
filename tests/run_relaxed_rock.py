@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='orb-rock-test-') as directory:
 #define HIGH 1
 uint32_t testNow = 10000;
 int opens = 0, delivered = 0;
-bool browsingNow = false;
+bool browsingNow = false, settingsNow = false;
 uint64_t esp_timer_get_time() { return uint64_t(testNow) * 1000; }
 uint32_t lv_tick_get() { return testNow; }
 '''+knob+r'''
@@ -40,6 +40,7 @@ void knob_help::dismiss() {}
 bool wind_notice::showing() { return false; }
 void wind_notice::turn(int) {}
 bool app_shell::browsing() { return browsingNow; }
+int app_shell::index() { return settingsNow ? app_shell::APP_SETTINGS : app_shell::APP_CLOCK; }
 void app_shell::browseTurn(int d) { delivered += d; }
 void app_shell::browsePress() {}
 void app_shell::openSwitcher() { ++opens; browsingNow = true; }
@@ -48,7 +49,7 @@ bool app_shell::pressCurrent() { return true; }
 int app_shell::count() { return 4; }
 void reset() {
     testNow += 5000;
-    opens = delivered = 0; browsingNow = false;
+    opens = delivered = 0; browsingNow = settingsNow = false;
     s_detent = s_rockDetent = s_isrLastDir = s_isrRunLen = 0;
     s_isrLastDirMs = s_rockMs = s_rockGapMs = 0;
     s_firedAt = s_settleRockAt = s_lastMotionAt = 0;
@@ -59,7 +60,7 @@ void turn(int dir, int count, uint32_t interval = 80) {
         testNow += interval;
         on_detent(dir);
         const int before = delivered;
-        const bool wasBrowsing = browsingNow;
+        const bool wasBrowsing = browsingNow || settingsNow;
         input_router::dispatch(dir, false);
         if (wasBrowsing) assert(delivered == before + dir); // each click, no settle delay
         input_router::tick();
@@ -81,7 +82,11 @@ int main() {
     reset(); browsingNow = true; turn(-1,6); turn(1,6); settle(); assert(opens == 0);
     assert(s_held == 0); assert(s_firedAt == s_rockMs);
     browsingNow = false; settle(); assert(opens == 0); // no stale gesture after selection
-    std::cout << "PASS: 9 gesture scenarios, including idle completion and scrolling\n";
+    reset(); settingsNow = true; turn(1,1); testNow += 850; turn(-1,1);
+    settle(); assert(opens == 0); assert(s_held == 0);
+    turn(1,6); testNow += 1000; turn(-1,6); settle(); assert(opens == 0);
+    settingsNow = false; settle(); assert(opens == 0); // no deferred gesture on Settings exit
+    std::cout << "PASS: menu and Settings reversals delivered immediately; outside gestures still work\n";
 }
 '''
     (work / 'test.cpp').write_text(harness, encoding='utf-8')
