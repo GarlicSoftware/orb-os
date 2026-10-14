@@ -58,7 +58,10 @@ void turn(int dir, int count, uint32_t interval = 80) {
     for (int i=0; i<count; ++i) {
         testNow += interval;
         on_detent(dir);
+        const int before = delivered;
+        const bool wasBrowsing = browsingNow;
         input_router::dispatch(dir, false);
+        if (wasBrowsing) assert(delivered == before + dir); // each click, no settle delay
         input_router::tick();
     }
 }
@@ -76,6 +79,8 @@ int main() {
     reset(); turn(-1,1); turn(1,1,10); settle(); assert(opens == 0); // bounce guard
     reset(); turn(1,10); settle(); assert(opens == 0); assert(delivered == 10);
     reset(); browsingNow = true; turn(-1,6); turn(1,6); settle(); assert(opens == 0);
+    assert(s_held == 0); assert(s_firedAt == s_rockMs);
+    browsingNow = false; settle(); assert(opens == 0); // no stale gesture after selection
     std::cout << "PASS: 9 gesture scenarios, including idle completion and scrolling\n";
 }
 '''

@@ -113,6 +113,16 @@ void input_router::dispatch(int delta, bool pressed) {
     if (delta != 0 || pressed) display::markInput(lv_tick_get());
 #endif
 
+    // Once the switcher is open, every click belongs to it immediately. Do not
+    // hold a reversal for gesture detection or discard it when a rock settles.
+    if (app_shell::browsing()) {
+        s_firedAt = knob::lastRockMs();
+        s_held = 0;
+        if (delta != 0) app_shell::browseTurn(delta);
+        if (pressed) app_shell::browsePress();
+        return;
+    }
+
     // A wound-down clock asking to be wound. Turning winds it; a press does nothing,
     // because five turns is the price and a press would be a way to skip it.
     //
@@ -132,15 +142,6 @@ void input_router::dispatch(int delta, bool pressed) {
     if (wind_notice::showing()) {
         if (rock == ROCK_FIRE) { app_shell::openSwitcher(); return; }
         if (delta != 0) wind_notice::turn(delta);
-        return;
-    }
-
-    // The switcher owns everything while it is up: turning cycles apps, pressing commits.
-    // Leaving it is the 2 s settle or a press, never the gesture, so a rock performed while
-    // browsing just cycles two apps and lands back where it started.
-    if (app_shell::browsing()) {
-        if (delta != 0) app_shell::browseTurn(delta);
-        if (pressed)    app_shell::browsePress();
         return;
     }
 
