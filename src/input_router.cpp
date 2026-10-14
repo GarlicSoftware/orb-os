@@ -8,6 +8,7 @@
 #endif
 #include "app_shell.h"
 #include "knob.h"
+#include "rock_config.h"
 
 // What the knob does, in one place, shared by the device (main.cpp) and the simulator
 // (sim_main.cpp) so "it behaved right in the sim" means "it behaves right on the Orb".
@@ -19,73 +20,18 @@
 // and this button takes real force to click. So the knob had one job and the button had all
 // the others, which is backwards for a device whose only control is a knob.
 //
-// Now a turn belongs to whatever app is on screen, and the switcher is opened by ROCKING the
-// knob: a quick turn one way immediately followed by a quick turn back. Ordinary use never
-// looks like that. Scrolling a list back and forth does, but slowly, and it is the speed that
-// separates the gesture from someone changing their mind, which is why the window is tight.
-//
-// EITHER direction fires. Left-then-right only was the rule until 2026-08-29, on the reasoning
-// that one fixed order halves the accidental reversals for no cost in performing it. There was
-// a cost: a hand reaching for the menu does not decide which way to go first, so half the
-// attempts did nothing. See knob.cpp for what carries the margin now, and UX-011.
-//
-// There is no fallback way in, by choice. If this proves unreliable on real hardware the
-// window is the thing to tune, and if it cannot be made reliable then a fallback should come
-// back rather than the tuning being fudged.
+// Turns normally belong to the app. A short spin each way opens the switcher;
+// the relaxed local profile allows up to 12 clicks and 1.5 seconds to reverse.
+// This also means back-and-forth scrolling inside an app may open the menu.
 namespace {
 
-// How long after a leftward detent a rightward one still counts as the same gesture. Short
-// enough that a deliberate reversal has to be quick; long enough to be performable. Tuned
-// on hardware, not derived — if this needs to move, this is the number.
-// Measured, not guessed. 320 was a guess and it was wrong by half.
-//
-// Nine rocks captured off the real knob on 2026-08-26, gap between the last left detent and
-// the first right one:
-//
-//     96, 150, 624, 624, 625, 654, 655, 644, 625 ms
-//
-// The two fast ones are what a deliberate, already-failed-once attempt looks like. The
-// natural motion is the cluster at 620-660, every one of which the old 320 window threw
-// away, which is exactly the reported "works sometimes". 800 clears the cluster with about
-// 20% of headroom and is still far short of anything a person would call a pause.
-//
-// The cost of being generous is small and bounded: while the switcher is up this check is
-// skipped entirely, so a false positive can only happen INSIDE an app, and of the apps that
-// read a turn at all the worst outcome is that scrolling Intel back and forth opens the
-// menu. If that ever becomes the complaint, this number is the dial, and the measurement is
-// still in the firmware to re-run it.
-//
-// 800 was not enough either, and the reason is worth writing down because it will happen
-// again to whoever measures this next. The 620-660 cluster was captured while the gesture
-// was FAILING, and a person whose rock has just been ignored rocks the next one harder and
-// faster. Measured again once it worked, on an unrelated errand, the same hand produced:
-//
-//     1096, 95, 1045, 5196 ms
-//
-// A natural rock is around a second; the fast ones are retries. Measuring a gesture at the
-// moment it is broken measures the frustration, not the gesture. 1400 covers the natural
-// motion and still rejects the 5196, which was a change of mind rather than a rock.
-//
-// This is also what "it works on Aviator but not on Steam Punk" turned out to be. Nothing
-// in this path knows what theme is loaded: the detection is in the knob ISR and the
-// dispatch is here. The rocks on that day were simply slower than the window.
-// Back to 800 alongside the run-length rule in knob.cpp, which is the change that actually
-// mattered. Widening this to 1400 without it made ordinary browsing open the menu, because
-// any left-then-right counted however far the left half had run. The two together are the
-// gesture: a SHORT turn back, then forward, reasonably promptly.
-// knob.cpp decides the quickness now (ROCK_QUICK_MS, 250 ms); this window only has to be
-// no tighter than that, and it is the same number so the two cannot disagree.
-constexpr uint32_t ROCK_WINDOW_MS = 250;
-
-// THE SETTLE. A reversal is not yet a rock; it is a rock if the hand STOPS. After the
-// reversal detent the router waits this long, holding the detents back from the app, and
-// then looks at what followed: nothing, or one more detent, and it was a flick, so the
-// menu opens; more than that and it was a scroll that changed direction, so the held
-// detents go to the app as if nothing had happened. Zion, browsing headlines: "it's very
-// easy to accidentally go into the main menu when you're just scrolling back and forth."
-// The cost is this delay before the menu appears, which is below what a hand notices.
-constexpr uint32_t ROCK_SETTLE_MS = 160;
-constexpr int32_t  ROCK_BACK_MAX  = 2;    // detents allowed on the reversed side, the reversal itself included
+// Match the encoder's generous reversal window and allow a short spin on both sides.
+constexpr uint32_t ROCK_WINDOW_MS = rock_config::REVERSAL_MS;
+constexpr uint32_t ROCK_SETTLE_MS = rock_config::SETTLE_MS;
+constexpr int32_t ROCK_BACK_MAX = rock_config::MAX_DETENTS;
+uint32_t s_settleRockAt = 0;
+uint32_t s_lastMotionAt = 0;
+int32_t s_lastMotionDetent = 0;
 
 // The reversal this router has already acted on, so one gesture cannot fire twice. Stored
 // as the timestamp rather than a flag: a second rock produces a new one, so it fires again
@@ -107,19 +53,28 @@ Rock rock_state() {
     const int32_t after = knob::detentCount() - knob::lastRockDetent();
     const int32_t back  = (after < 0 ? -after : after) + 1;   // the reversal detent counts
     if (back > ROCK_BACK_MAX) { s_firedAt = at; return ROCK_REJECT; }
-    if ((uint32_t)(lv_tick_get() - at) < ROCK_SETTLE_MS) return ROCK_PENDING;
+    const uint32_t now = lv_tick_get();
+    const int32_t position = knob::detentCount();
+    if (s_settleRockAt != at) {
+        s_settleRockAt = at;
+        s_lastMotionAt = now;
+        s_lastMotionDetent = position;
+    } else if (position != s_lastMotionDetent) {
+        s_lastMotionAt = now;
+        s_lastMotionDetent = position;
+    }
+    if ((uint32_t)(now - s_lastMotionAt) < ROCK_SETTLE_MS) return ROCK_PENDING;
     s_firedAt = at;
     return ROCK_FIRE;
 }
 
-bool rock_pending() { return rock_state() == ROCK_PENDING; }
 
 }  // namespace
 
 // A reversal that is settling needs a poll with no new input to finish settling. main.cpp
 // and the simulator call this every pass; it is a no-op unless a reversal is in flight.
 void input_router::tick() {
-    if (rock_pending()) return;                 // still inside the settle: nothing to decide
+    // dispatch owns consumption: probing rock_state here could swallow ROCK_FIRE.
     if (knob::lastRockMs() != 0 && knob::lastRockMs() != s_firedAt) dispatch(0, false);
 }
 
@@ -200,11 +155,8 @@ void input_router::dispatch(int delta, bool pressed) {
     // there, so a rock would throw you out mid-read. Two things have changed since that was
     // written.
     //
-    // The detector no longer accepts a scroll. knob.cpp's run-length rule means only a flick
-    // of one or two detents followed by a reversal within 45-900 ms qualifies; a list scrolled
-    // three detents and corrected by one is not a rock and never was going to be. What is
-    // left is a single overshoot corrected within a second, which is narrow, and Zion has
-    // chosen it over the alternative.
+    // The local relaxed gesture works in captured screens too. A short scroll
+    // and correction can therefore open the switcher, an intentional usability tradeoff.
     //
     // The alternative was the Orb contradicting itself. The hint it shows on a press that has
     // nowhere to go says "To activate the main menu from any app, rock the knob", and Settings

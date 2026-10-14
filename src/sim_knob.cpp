@@ -4,6 +4,7 @@
 //   - a long-press fires once after LONG_PRESS_MS of continuous hold, in addition
 //     to the down-edge press, exactly as the hardware does
 #include "knob.h"
+#include "rock_config.h"
 #include "sim_knob.h"
 
 namespace {
@@ -26,10 +27,10 @@ namespace {
 // at most ROCK_MAX_RUN detents, arriving between ROCK_MIN_GAP_MS and ROCK_QUICK_MS after
 // the last detent the other way, in either direction. Anything the sim decides differently
 // from the device is a bug in one of them.
-static constexpr int      ROCK_MAX_RUN    = 2;
-static constexpr uint32_t ROCK_MIN_GAP_MS = 45;
-static constexpr uint32_t ROCK_QUICK_MS   = 250;
-static constexpr uint32_t ROCK_MAX_GAP_MS = 900;
+static constexpr int      ROCK_MAX_RUN    = rock_config::MAX_DETENTS;
+static constexpr uint32_t ROCK_MIN_GAP_MS = rock_config::MIN_REVERSAL_MS;
+static constexpr uint32_t ROCK_QUICK_MS   = rock_config::REVERSAL_MS;
+static constexpr uint32_t ROCK_MAX_GAP_MS = rock_config::NEW_RUN_MS;
 static int      s_lastDir    = 0;
 static uint32_t s_lastDirMs  = 0;
 static int      s_runLen     = 0;

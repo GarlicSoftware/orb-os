@@ -1,5 +1,10 @@
 # The Orb OS
 
+This fork tracks GarlicSoftware's custom Orb firmware. See
+[LOCAL_CHANGES.md](LOCAL_CHANGES.md) for the relaxed menu gesture, testing, and
+rollback instructions. The original project is
+[Ziplock78/orb-os](https://github.com/Ziplock78/orb-os).
+
 <p align="center">
   <a href="https://zionbrock.com/orb"><img src="https://img.shields.io/badge/The%20Orb-zionbrock.com%2Forb-B5713E" alt="The Orb"></a>
   <img src="https://img.shields.io/badge/board-ESP32--S3%20round%20AMOLED-E7352C?logo=espressif&logoColor=white" alt="Board: ESP32-S3 round AMOLED">

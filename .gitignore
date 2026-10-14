@@ -9,6 +9,7 @@
 .DS_Store
 
 # Build artifacts
+local-firmware/
 *.bin
 *.elf
 *.map

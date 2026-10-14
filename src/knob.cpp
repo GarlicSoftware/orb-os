@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "knob.h"
+#include "rock_config.h"
 #include <esp_timer.h>   // esp_timer_get_time() — IRAM-safe, unlike millis() from an ISR
 #include "display.h"     // orb_log_quiet(): see the note there on what printing costs
 
@@ -14,21 +15,11 @@ static constexpr uint8_t PIN_KNOB_SW = 16;   // encoder push switch (active low,
 // If turns feel doubled or halved on real hardware, tune this to 2 or 1.
 static constexpr int32_t KNOB_STEPS_PER_DETENT = 4;
 
-// How many detents the leftward half of a rock may span before it stops being a rock.
-// Two, so a slightly heavy flick still counts, but a deliberate scroll does not.
-static constexpr int ROCK_MAX_RUN = 2;
-
-// A rock has to be humanly possible, and QUICK. Below the minimum it is contact bounce.
-// The reversal has to come within ROCK_QUICK_MS of the last detent the other way: a flick
-// back and forth is one motion, and a hand reverses inside a quarter of a second when it
-// means the gesture. It was 800 ms, and at 800 ms the ordinary back-and-forth of browsing a
-// list (down two, up one to reread) was a rock; Zion, in the News app: "it's very easy to
-// accidentally go into the main menu when you're just scrolling back and forth." The pause
-// that ends a run stays wider, because that is a different question: how long after a turn
-// the next detent is a new gesture rather than the same one.
-static constexpr uint32_t ROCK_MIN_GAP_MS = 45;
-static constexpr uint32_t ROCK_QUICK_MS   = 250;
-static constexpr uint32_t ROCK_MAX_GAP_MS = 900;
+// Shared local tuning also used by the router and desktop encoder.
+static constexpr int ROCK_MAX_RUN = rock_config::MAX_DETENTS;
+static constexpr uint32_t ROCK_MIN_GAP_MS = rock_config::MIN_REVERSAL_MS;
+static constexpr uint32_t ROCK_QUICK_MS = rock_config::REVERSAL_MS;
+static constexpr uint32_t ROCK_MAX_GAP_MS = rock_config::NEW_RUN_MS;
 
 static constexpr uint32_t SW_DEBOUNCE_MS = 200;  // min time between accepted presses. Wide on purpose:
                                                   //   this switch bounces heavily, and 200ms is still far
@@ -65,10 +56,7 @@ static uint32_t s_lastDirMs  = 0;
 // out. esp_timer_get_time rather than millis() because this runs from IRAM.
 static volatile int      s_isrLastDir   = 0;
 static volatile uint32_t s_isrLastDirMs = 0;
-// How many detents the current direction has run for. A rock is a small deliberate wiggle,
-// so the turn INTO it has to be small: without this, five detents left followed by one
-// right counted as a rock, which is just ordinary browsing and is why the menu appeared to
-// open on any turn at all.
+// Count the current run to bound the short-spin gesture.
 static volatile int      s_isrRunLen    = 0;
 static volatile int32_t  s_anchor       = 0;   // rawPos at the last COMMITTED detent
 static volatile int32_t  s_detent       = 0;   // committed detents; the one true stream
@@ -121,7 +109,7 @@ static void IRAM_ATTR on_detent(int dir) {
     s_detent += dir;
     const uint32_t now = (uint32_t)(esp_timer_get_time() / 1000);
     // A rock is a SHORT turn one way, then straight back, as one gesture.
-    //   run length : the turn into the reversal was a flick, not a scroll
+    //   run length : a short spin, bounded by the shared local tuning
     //   gap        : one gesture rather than two decisions
     //   minimum gap: a hand cannot reverse in five milliseconds. Anything faster is the
     //                encoder, not the person, and treating it as input is what let a
