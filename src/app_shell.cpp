@@ -65,7 +65,6 @@ namespace {
     lv_obj_t *s_overlayHint   = nullptr;   // "push to open" — stock only, a custom design speaks for itself
     lv_obj_t *s_overlayPlate  = nullptr;   // a custom menu's baked background image, if any
     lv_obj_t *s_overlayGlass  = nullptr;   // a custom menu's baked CRT+glass, if any
-    uint32_t  s_browseTouch   = 0;         // millis() of the last browse interaction
     // How many detents move the menu on by one app.
     //
     // One. Two was tried on 2026-08-26 and rejected on the hardware within minutes: it
@@ -92,7 +91,6 @@ namespace {
     // Accumulating instead means no detent is ever lost. It also makes the two-per-item rule
     // above free, rather than a second place where input gets dropped on purpose.
     static int s_browseAccum = 0;
-    constexpr uint32_t BROWSE_SETTLE_MS = 2000;   // auto-enter the shown app after this idle
 
     int next_visible(int from, int dir);   // forward decl — defined below, needed by show_overlay above it
     void load(int idx, bool animate, bool forward);   // same, needed by commit_current()
@@ -226,7 +224,6 @@ namespace {
         // full-frame repaint per detent.
         if (lv_obj_has_flag(s_overlay, LV_OBJ_FLAG_HIDDEN))
             lv_obj_clear_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
-        s_browseTouch = millis();          // any turn/open restarts the settle countdown
     }
     void hide_overlay() {
         if (s_overlay) lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
@@ -249,10 +246,6 @@ namespace {
         diag::log("enter %s", s_apps[s_cur].name);
     }
 
-    // Runs on the LVGL thread; if the switcher has sat idle long enough, drop into the shown app.
-    void browse_tick(lv_timer_t * /*t*/) {
-        if (s_browsing && (millis() - s_browseTouch) >= BROWSE_SETTLE_MS) commit_current();
-    }
 
     // Next non-hidden app from `from` stepping by `dir` (+1/-1), wrapping around.
     // Falls back to `from` if somehow everything is hidden, so cycling never hangs.
@@ -534,7 +527,7 @@ void app_shell::begin() {
 
     lv_obj_add_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
 
-    lv_timer_create(browse_tick, 200, nullptr);   // watches for the 3s browse settle
+    // Keep the switcher open until the user explicitly selects an app by pressing.
 
     if (s_count) load(0, false, true);
 }

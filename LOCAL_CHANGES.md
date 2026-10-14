@@ -1,6 +1,6 @@
 # Relaxed rock gesture
 
-Local build `2.17.01-relaxed-rock.2`, based on Orb OS 2.17.01.
+Local build `2.17.01-relaxed-rock.3`, based on Orb OS 2.17.01.
 
 Turn a short distance either way, reverse, then stop. Both halves can span up to
 12 detected clicks. The reversal can take up to 1.5 seconds, instead of 250 ms.
@@ -12,7 +12,11 @@ desktop encoder, and menu router. The router's idle tick now dispatches a comple
 gesture instead of consuming it during a preliminary state check.
 
 Back-and-forth scrolling in an app may also open the menu with these wider limits.
-Button behavior and app menu selection are unchanged.
+Pressing selects the highlighted app. The app menu stays open until you press;
+the original two-second automatic selection timer has been removed in `.3`.
+Verified on the board by opening the app menu, moving to another item, and waiting
+five seconds: the switcher remained open and the underlying app did not change.
+The USB `apps` reply now includes `browsing` for checking this state directly.
 
 ## Immediate menu turns
 

@@ -241,6 +241,7 @@ void cmd_apps() {
     out_reset();
     out_str("{\"ok\":true,\"current\":");
     out_fmt("%d", app_shell::index());
+    out_str(app_shell::browsing() ? ",\"browsing\":true" : ",\"browsing\":false");
     out_str(",\"apps\":[");
     for (int i = 0; i < app_shell::count(); ++i) {
         if (i) out_ch(',');
