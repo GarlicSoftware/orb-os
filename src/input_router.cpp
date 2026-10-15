@@ -98,7 +98,8 @@ void input_router::dispatch(int delta, bool pressed) {
     // screen that ignored it, which is the silence this panel exists to break.
     if (knob_help::showing()) {
         if (pressed || delta != 0) knob_help::dismiss();
-        return;
+        // A Clock press dismisses an old hint and performs the requested action.
+        if (!(pressed && app_shell::index() == app_shell::APP_CLOCK)) return;
     }
     // Stamped here rather than in the menu, because "how long until I see it" is a question
     // worth being able to ask of any screen. The first attempt timed only the switcher, on
@@ -133,8 +134,16 @@ void input_router::dispatch(int delta, bool pressed) {
         return;
     }
 
-    // A wound-down clock asking to be wound. Turning winds it; a press does nothing,
-    // because five turns is the price and a press would be a way to skip it.
+    // The Clock's button is a direct way into the app menu, even while winding
+    // is requested or a reversal is still settling. It does not wind the clock.
+    if (pressed && app_shell::index() == app_shell::APP_CLOCK && app_shell::count() > 0) {
+        s_firedAt = knob::lastRockMs();
+        s_held = 0;
+        app_shell::openSwitcher();
+        return;
+    }
+
+    // A wound-down clock asking to be wound. Turning winds it.
     //
     // The rock is checked FIRST and deliberately still works, so this screen can always be
     // left. Winding counts detents in one direction only, which is what leaves a reversal

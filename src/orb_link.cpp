@@ -334,7 +334,7 @@ void cmd_turn(const char *arg) {
 }
 
 void cmd_press() {
-    app_shell::pressCurrent();
+    input_router::dispatch(0, true);   // same action as the physical encoder button
     out_reset();
     out_str("{\"ok\":true,\"pressed\":");
     out_json_string(app_shell::name());

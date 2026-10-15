@@ -1,6 +1,6 @@
 # Relaxed rock gesture
 
-Local build `2.17.01-relaxed-rock.5`, based on Orb OS 2.17.01.
+Local build `2.17.01-relaxed-rock.6`, based on Orb OS 2.17.01.
 
 Turn a short distance either way, reverse, then stop. Both halves can span up to
 12 detected clicks. The reversal can take up to 1.5 seconds, instead of 250 ms.
@@ -40,6 +40,15 @@ volume preview are retained.
 Regression tests exercise immediate Settings reversals and consume stale gestures
 on exit. `tests/run_volume_return.py` checks the actual save branch for all three
 targets at levels 0, 50, and 100, including persistence, Sound return, and preview.
+
+## Clock button
+
+In `.6`, pressing the knob while viewing Clock immediately opens the app menu.
+This also works while the clock needs winding or a rock gesture is settling.
+An old gesture-help overlay is dismissed and the same press opens the menu.
+Once browsing, the button selects the highlighted app as usual. Settings and
+other apps keep their own button actions. USB `press` now uses the physical
+button's input-router path so these behaviors can be verified on the device.
 
 ## Build and verify
 

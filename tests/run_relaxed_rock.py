@@ -23,6 +23,8 @@ with tempfile.TemporaryDirectory(prefix='orb-rock-test-') as directory:
 uint32_t testNow = 10000;
 int opens = 0, delivered = 0;
 bool browsingNow = false, settingsNow = false;
+bool windShowing = false, helpShowing = false;
+int helpCalls = 0, pressCalls = 0, browsePressCalls = 0, ordinaryApp = 0;
 uint64_t esp_timer_get_time() { return uint64_t(testNow) * 1000; }
 uint32_t lv_tick_get() { return testNow; }
 '''+knob+r'''
@@ -34,22 +36,24 @@ int32_t knob::detentCount() { return s_detent; }
 #include "input_router.cpp"
 bool update_ui::awaitingAck() { return false; }
 void update_ui::ackReady() {}
-bool knob_help::showing() { return false; }
-void knob_help::show() {}
-void knob_help::dismiss() {}
-bool wind_notice::showing() { return false; }
+bool knob_help::showing() { return helpShowing; }
+void knob_help::show() { ++helpCalls; helpShowing=true; }
+void knob_help::dismiss() { helpShowing=false; }
+bool wind_notice::showing() { return windShowing; }
 void wind_notice::turn(int) {}
 bool app_shell::browsing() { return browsingNow; }
-int app_shell::index() { return settingsNow ? app_shell::APP_SETTINGS : app_shell::APP_CLOCK; }
+int app_shell::index() { return settingsNow ? app_shell::APP_SETTINGS : ordinaryApp; }
 void app_shell::browseTurn(int d) { delivered += d; }
-void app_shell::browsePress() {}
+void app_shell::browsePress() { ++browsePressCalls; browsingNow=false; }
 void app_shell::openSwitcher() { ++opens; browsingNow = true; }
 void app_shell::turnCurrent(int d) { delivered += d; }
-bool app_shell::pressCurrent() { return true; }
+bool app_shell::pressCurrent() { ++pressCalls; return true; }
 int app_shell::count() { return 4; }
 void reset() {
     testNow += 5000;
     opens = delivered = 0; browsingNow = settingsNow = false;
+    windShowing=helpShowing=false;
+    helpCalls=pressCalls=browsePressCalls=ordinaryApp=0;
     s_detent = s_rockDetent = s_isrLastDir = s_isrRunLen = 0;
     s_isrLastDirMs = s_rockMs = s_rockGapMs = 0;
     s_firedAt = s_settleRockAt = s_lastMotionAt = 0;
@@ -86,6 +90,19 @@ int main() {
     settle(); assert(opens == 0); assert(s_held == 0);
     turn(1,6); testNow += 1000; turn(-1,6); settle(); assert(opens == 0);
     settingsNow = false; settle(); assert(opens == 0); // no deferred gesture on Settings exit
+    reset(); input_router::dispatch(0,true);
+    assert(opens==1 && helpCalls==0 && pressCalls==0);
+    input_router::dispatch(0,true); assert(browsePressCalls==1 && opens==1);
+    reset(); windShowing=true; input_router::dispatch(0,true);
+    assert(opens==1 && helpCalls==0);
+    reset(); helpShowing=true; input_router::dispatch(0,true);
+    assert(opens==1 && !helpShowing);
+    reset(); turn(-1,1); turn(1,1); input_router::dispatch(0,true);
+    assert(opens==1 && s_held==0); settle(); assert(opens==1);
+    reset(); settingsNow=true; input_router::dispatch(0,true);
+    assert(opens==0 && pressCalls==1);
+    reset(); ordinaryApp=app_shell::APP_INTEL; input_router::dispatch(0,true);
+    assert(opens==0 && pressCalls==1);
     std::cout << "PASS: menu and Settings reversals delivered immediately; outside gestures still work\n";
 }
 '''
